@@ -1,0 +1,59 @@
+services:
+  db:
+    image: "postgres:bullseye"
+    hostname: localhost
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=2016
+      - POSTGRES_DB=hospital_admission
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql/data
+    restart: on-failure
+    healthcheck:
+        test: pg_isready -U postgres -d db
+        interval: 30s
+        timeout: 10s
+        retries: 5
+  etl:
+    build:
+      context: ./
+      dockerfile: ./dockerfiles/etl.dockerfile
+    environment:
+      - EXECUTION_MODE=test #test or production
+    restart: on-failure
+    depends_on:
+      - db
+    links:
+      - db
+  ml:
+    build: 
+      context: ./
+      dockerfile: ./dockerfiles/ml.dockerfile
+    environment:
+      - EXECUTION_MODE=test #test or production
+    restart: on-failure
+    depends_on:
+      - db
+      - etl
+    links:
+      - db
+  visualization:
+    build: 
+      context: ./
+      dockerfile: ./dockerfiles/visualization.dockerfile
+    ports:
+      - "8080:80"
+    restart: on-failure
+    depends_on:
+      - db
+      - etl
+      - ml
+    links:
+      - db
+volumes:
+  postgres-data:
